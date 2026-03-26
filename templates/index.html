@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI CheatCam | Login</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    
+    <style>
+        
+        .bg-grid {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-image:
+                linear-gradient(rgba(0, 243, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 243, 255, 0.05) 1px, transparent 1px);
+            background-size: 30px 30px;
+            z-index: -2; 
+        }
+
+       
+        .scanner-panel {
+            position: relative;
+            overflow: hidden;
+            padding: 50px 40px !important; 
+        }
+
+        .scanner-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: var(--neon-magenta);
+            box-shadow: 0 0 10px var(--neon-magenta), 0 0 20px var(--neon-magenta);
+            animation: scan 3s infinite linear;
+            opacity: 0.6;
+        }
+
+        @keyframes scan {
+            0% { top: 0; }
+            50% { top: 100%; }
+            100% { top: 0; }
+        }
+
+    
+        .logo-icon {
+            font-size: 3.5rem;
+            margin-bottom: 15px;
+            text-shadow: 0 0 15px var(--neon-cyan);
+        }
+
+        .status-text {
+            font-family: monospace;
+            color: #00ff00;
+            font-size: 0.9rem;
+            margin-bottom: 25px;
+            letter-spacing: 1px;
+            text-align: left;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 2px solid #00ff00;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-grid"></div>
+
+    <div id="tsparticles"></div>
+
+    <div class="container" style="display: flex; justify-content: center; align-items: center; height: 100vh;">
+        
+        <div class="glass-panel scanner-panel" style="text-align: center; max-width: 450px; width: 100%;">
+            
+            <div class="scanner-line"></div>
+
+            <div class="logo-icon">👁️‍🗨️</div>
+
+            <h1 style="font-size: 2.5rem; margin-bottom: 10px;">AI CheatCam</h1>
+     
+
+            <div class="status-text">
+                > SECURE CONNECTION ESTABLISHED<br>
+                > STATUS: OFFLINE<br>
+                > AWAITING INITIALIZATION...
+            </div>
+            
+            
+            <a href="{{ url_for('dashboard') }}" class="neon-btn" style="width: 100%; letter-spacing: 2px;">
+                Initialize System
+            </a>
+            
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-engine@2/tsparticles.engine.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-basic@2/tsparticles.basic.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-interaction-particles-links@2/tsparticles.interaction.particles.links.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-move-base@2/tsparticles.move.base.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-shape-circle@2/tsparticles.shape.circle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-updater-color@2/tsparticles.updater.color.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-updater-opacity@2/tsparticles.updater.opacity.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-updater-size@2/tsparticles.updater.size.min.js"></script>
+    
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

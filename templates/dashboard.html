@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI CheatCam | CCTV Monitor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div id="tsparticles"></div>
+
+    <div class="app-wrapper">
+        <nav class="sidebar">
+            <div class="sidebar-brand">
+                <h2 style="color: var(--neon-cyan); font-size: 1.5rem;">AI CheatCam</h2>
+                <p style="color: #aaa; font-size: 0.8rem; margin-top: 5px;">CCTV Node: Alpha</p>
+            </div>
+            
+            <a href="{{ url_for('dashboard') }}" class="nav-link">🏛️ Room CS-101</a>
+            <a href="{{ url_for('classroom') }}" class="nav-link">🏛️ Room CS-102</a>
+            <a href="{{ url_for('database') }}" class="nav-link">⚠️ Alert Database</a>
+            <a href="#" class="nav-link">⚙️ System Config</a>
+            
+            <div style="margin-top: auto;">
+                <a href="{{ url_for('index') }}" class="nav-link danger" style="justify-content: center;">System Logout</a>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <div class="glass-panel">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2>Camera 01 <span style="color: #00ff00; font-size: 0.8rem;">● REC</span></h2>
+                    <span style="font-family: 'Orbitron'; color: var(--neon-cyan);">Room CS-101</span>
+                </div>
+                
+                <div class="webcam-container" style="margin-top: 20px;">
+                    <img id="webcam" src="{{ url_for('video_feed') }}" alt="CCTV Feed" style="width: 100%; height: 100%; object-fit: cover;">
+                </div>
+            </div>
+
+            <div class="glass-panel">
+                <h2 style="color: var(--neon-magenta); text-shadow: 0 0 10px var(--neon-magenta);">Live Events</h2>
+                <div class="alert-box" id="alert-log" style="margin-top: 20px;">
+                    <div class="alert-item">System Initialized. Scanning room...</div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-engine@2/tsparticles.engine.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-basic@2/tsparticles.basic.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-interaction-particles-links@2/tsparticles.interaction.particles.links.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-move-base@2/tsparticles.move.base.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-shape-circle@2/tsparticles.shape.circle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-updater-color@2/tsparticles.updater.color.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-updater-opacity@2/tsparticles.updater.opacity.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-updater-size@2/tsparticles.updater.size.min.js"></script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

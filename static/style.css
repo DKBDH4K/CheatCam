@@ -1,0 +1,276 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500&display=swap');
+
+:root {
+    --neon-cyan: #00f3ff;
+    --neon-magenta: #ff00e6;
+    --dark-bg: #0b0c10;
+    --glass-bg: rgba(16, 18, 27, 0.6);
+    --glass-border: rgba(0, 243, 255, 0.2);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Rajdhani', sans-serif;
+    background-color: var(--dark-bg);
+    color: white;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Particle Container */
+#tsparticles {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+}
+
+/* Glassmorphism Panels */
+.glass-panel {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    border-radius: 15px;
+    padding: 30px;
+    box-shadow: 0 0 20px rgba(0, 243, 255, 0.1);
+}
+
+h1, h2, h3 {
+    font-family: 'Orbitron', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+h1 {
+    color: var(--neon-cyan);
+    text-shadow: 0 0 10px var(--neon-cyan);
+    margin-bottom: 20px;
+}
+
+.neon-btn {
+    background: transparent;
+    color: var(--neon-cyan);
+    border: 1px solid var(--neon-cyan);
+    padding: 15px 30px;
+    font-size: 1.2rem;
+    font-family: 'Orbitron', sans-serif;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    text-decoration: none;
+    display: inline-block;
+    margin-top: 20px;
+}
+
+.neon-btn:hover {
+    background: var(--neon-cyan);
+    color: var(--dark-bg);
+    box-shadow: 0 0 20px var(--neon-cyan);
+}
+
+/* DASHBOARD SPECIFIC STYLES */
+
+.dashboard-layout {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 20px;
+    padding: 40px;
+    height: 100vh;
+}
+
+.webcam-container {
+    position: relative;
+    width: 100%;
+    height: 60vh;
+    background: #000;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 2px solid var(--glass-border);
+}
+
+.alert-box {
+    height: 60vh;
+    overflow-y: auto;
+}
+
+.alert-box::-webkit-scrollbar {
+    width: 8px;
+}
+.alert-box::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2); 
+}
+.alert-box::-webkit-scrollbar-thumb {
+    background: var(--neon-cyan); 
+    border-radius: 4px;
+}
+
+.alert-item {
+    background: rgba(255, 0, 230, 0.1);
+    border-left: 4px solid var(--neon-magenta);
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 0 5px 5px 0;
+    animation: slideIn 0.3s ease-out;
+}
+
+.alert-item.critical {
+    border-left-color: #ff003c;
+    background: rgba(255, 0, 60, 0.1);
+    color: #ff003c;
+    text-shadow: 0 0 5px #ff003c;
+}
+
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* NEW CCTV DASHBOARD LAYOUT */
+
+.app-wrapper {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    z-index: 1;
+    position: relative;
+}
+
+/* Sidebar Styling */
+.sidebar {
+    width: 260px;
+    background: rgba(11, 12, 16, 0.85);
+    -webkit-backdrop-filter: blur(15px);
+    backdrop-filter: blur(15px);
+    border-right: 1px solid var(--glass-border);
+    padding: 30px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    box-shadow: 5px 0 15px rgba(0, 0, 0, 0.5);
+}
+
+.sidebar-brand {
+    text-align: center;
+    margin-bottom: 30px;
+    border-bottom: 1px solid var(--glass-border);
+    padding-bottom: 20px;
+}
+
+.nav-link {
+    color: white;
+    text-decoration: none;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    transition: all 0.3s;
+    font-family: 'Orbitron', sans-serif;
+    text-transform: uppercase;
+    font-size: 0.9rem;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.nav-link:hover, .nav-link.active {
+    background: rgba(0, 243, 255, 0.1);
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
+    box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
+}
+
+.nav-link.danger:hover {
+    background: rgba(255, 0, 230, 0.1);
+    border-color: var(--neon-magenta);
+    color: var(--neon-magenta);
+    box-shadow: 0 0 10px rgba(255, 0, 230, 0.2);
+}
+
+
+.main-content {
+    flex-grow: 1;
+    padding: 30px;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 30px;
+    overflow: hidden;
+}
+
+.webcam-container {
+    position: relative;
+    width: 100%;
+    height: 70vh;
+    background: #000;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 2px solid var(--glass-border);
+}
+
+.glass-table-container {
+    width: 100%;
+    overflow-x: auto;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    border: 1px solid var(--glass-border);
+}
+
+.glass-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+}
+
+.glass-table th {
+    padding: 15px 20px;
+    background: rgba(0, 243, 255, 0.1);
+    color: var(--neon-cyan);
+    font-family: 'Orbitron', sans-serif;
+    text-transform: uppercase;
+    font-size: 0.9rem;
+    letter-spacing: 1px;
+    border-bottom: 2px solid var(--neon-cyan);
+}
+
+.glass-table td {
+    padding: 15px 20px;
+    border-bottom: 1px solid var(--glass-border);
+    color: #e0e0e0;
+}
+
+.glass-table tbody tr {
+    transition: background 0.3s ease;
+}
+
+.glass-table tbody tr:hover {
+    background: rgba(255, 0, 230, 0.05);
+}
+
+/* Status Badges */
+.badge {
+    padding: 5px 12px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.badge.critical {
+    background: rgba(255, 0, 60, 0.1);
+    color: #ff003c;
+    border: 1px solid #ff003c;
+    box-shadow: 0 0 8px rgba(255, 0, 60, 0.4);
+}
+
+.badge.warning {
+    background: rgba(255, 204, 0, 0.1);
+    color: #ffcc00;
+    border: 1px solid #ffcc00;
+}
