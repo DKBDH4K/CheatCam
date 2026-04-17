@@ -3,95 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI CheatCam | Login</title>
+    <title>CHEATCAM | SYSTEM INITIALIZATION</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     
     <style>
-        
-        .bg-grid {
+        .cyber-grid {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
             background-image:
                 linear-gradient(rgba(0, 243, 255, 0.05) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(0, 243, 255, 0.05) 1px, transparent 1px);
-            background-size: 30px 30px;
+            background-size: 50px 50px;
             z-index: -2; 
         }
 
-       
+        .hero-section {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+            gap: 20px;
+        }
+
         .scanner-panel {
-            position: relative;
-            overflow: hidden;
-            padding: 50px 40px !important; 
+            min-width: 450px;
+            text-align: center;
         }
 
-        .scanner-line {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 2px;
-            background: var(--neon-magenta);
-            box-shadow: 0 0 10px var(--neon-magenta), 0 0 20px var(--neon-magenta);
-            animation: scan 3s infinite linear;
-            opacity: 0.6;
-        }
-
-        @keyframes scan {
-            0% { top: 0; }
-            50% { top: 100%; }
-            100% { top: 0; }
-        }
-
-    
-        .logo-icon {
-            font-size: 3.5rem;
-            margin-bottom: 15px;
-            text-shadow: 0 0 15px var(--neon-cyan);
-        }
-
-        .status-text {
-            font-family: monospace;
-            color: #00ff00;
-            font-size: 0.9rem;
-            margin-bottom: 25px;
-            letter-spacing: 1px;
+        .status-box {
+            background: rgba(0, 0, 0, 0.6);
+            border-left: 3px solid var(--cyber-yellow);
+            padding: 15px;
             text-align: left;
-            background: rgba(0, 0, 0, 0.3);
-            padding: 10px;
-            border-radius: 5px;
-            border-left: 2px solid #00ff00;
+            margin: 20px 0;
+            font-family: monospace;
+            color: var(--cyber-yellow);
+            font-size: 0.8rem;
+        }
+
+        .glitch-logo {
+            font-size: 4rem;
+            margin-bottom: 10px;
+            animation: glitch 1s infinite;
         }
     </style>
 </head>
 <body>
-    <div class="bg-grid"></div>
-
+    <div class="cyber-grid"></div>
     <div id="tsparticles"></div>
 
-    <div class="container" style="display: flex; justify-content: center; align-items: center; height: 100vh;">
-        
-        <div class="glass-panel scanner-panel" style="text-align: center; max-width: 450px; width: 100%;">
+    <div class="hero-section">
+        <div class="glass-panel scanner-panel">
+            <div class="glitch-logo">👁️</div>
+            <h1 class="glitch-text" style="font-size: 3rem;">CHEATCAM</h1>
+            <p style="color: var(--cyber-blue); letter-spacing: 5px; font-weight: 700;">AI MONITORING SYSTEM</p>
             
-            <div class="scanner-line"></div>
-
-            <div class="logo-icon">👁️‍🗨️</div>
-
-            <h1 style="font-size: 2.5rem; margin-bottom: 10px;">AI CheatCam</h1>
-     
-
-            <div class="status-text">
-                > SECURE CONNECTION ESTABLISHED<br>
-                > STATUS: OFFLINE<br>
-                > AWAITING INITIALIZATION...
+            <div class="status-box">
+                > INITIALIZING BIOMETRIC SCAN...<br>
+                > LOADING YOLO_V8_MODULES...<br>
+                > STATUS: [WAITING_FOR_USER]
             </div>
-            
-            
-            <a href="{{ url_for('dashboard') }}" class="neon-btn" style="width: 100%; letter-spacing: 2px;">
-                Initialize System
+
+            <a href="{{ url_for('dashboard') }}" class="neon-btn" style="width: 100%;">
+                Initialize Neural Link
             </a>
-            
         </div>
+        
+        <p style="font-family: 'Orbitron'; font-size: 0.7rem; color: #444; margin-top: 20px;">
+            CRIMINAL_CODE // ART_2077 // SECURE_ACCESS_REQUIRED
+        </p>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/tsparticles-engine@2/tsparticles.engine.min.js"></script>
@@ -102,7 +83,6 @@
     <script src="https://cdn.jsdelivr.net/npm/tsparticles-updater-color@2/tsparticles.updater.color.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tsparticles-updater-opacity@2/tsparticles.updater.opacity.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tsparticles-updater-size@2/tsparticles.updater.size.min.js"></script>
-    
     <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

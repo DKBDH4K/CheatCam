@@ -3,46 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI CheatCam | CS-102</title>
+    <title>CHEATCAM | NODE_CS_102</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div id="tsparticles"></div>
 
     <div class="app-wrapper">
-        
         <nav class="sidebar">
             <div class="sidebar-brand">
-                <h2 style="color: var(--neon-cyan); font-size: 1.5rem;">AI CheatCam</h2>
-                <p style="color: #aaa; font-size: 0.8rem; margin-top: 5px;">CCTV Node: Alpha</p>
+                <h2 class="glitch-text">CHEATCAM AI</h2>
+                <p style="color: #666; font-size: 0.7rem; margin-top: 5px; font-family: monospace;">NODE_ID: 0x7FFA_ALPHA</p>
             </div>
             
-            <a href="{{ url_for('dashboard') }}" class="nav-link">🏛️ Room CS-101</a>
-            <a href="{{ url_for('classroom') }}" class="nav-link active">🏛️ Room CS-102</a>
-            <a href="{{ url_for('database') }}" class="nav-link">⚠️ Alert Database</a>
-            <a href="#" class="nav-link">⚙️ System Config</a>
+            <a href="{{ url_for('dashboard') }}" class="nav-link"><span>01</span> Room CS-101</a>
+            <a href="{{ url_for('classroom') }}" class="nav-link active"><span>02</span> Room CS-102</a>
+            <a href="{{ url_for('database') }}" class="nav-link"><span>03</span> Incident Logs</a>
+            <a href="#" class="nav-link"><span>04</span> Settings </a>
             
             <div style="margin-top: auto;">
-                <a href="{{ url_for('index') }}" class="nav-link danger" style="justify-content: center;">System Logout</a>
+                <a href="{{ url_for('index') }}" class="nav-link danger"><span>XX</span> Terminate Link</a>
             </div>
         </nav>
 
         <main class="main-content">
             <div class="glass-panel">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h2>Camera 02 <span style="color: #00ff00; font-size: 0.8rem;">● REC</span></h2>
-                    <span style="font-family: 'Orbitron'; color: var(--neon-cyan);">Room CS-102</span>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--cyber-border); padding-bottom: 10px;">
+                    <h2 style="font-size: 1rem;">SECURE_FEED_02 <span style="color: #ff003c; font-size: 0.8rem; margin-left: 10px;">• RECORDING</span></h2>
+                    <span style="font-family: 'Orbitron'; color: var(--cyber-yellow); font-size: 0.8rem;">LOC: ROOM_CS_102</span>
                 </div>
                 
                 <div class="webcam-container" style="margin-top: 20px;">
-                    <img id="webcam" src="{{ url_for('video_feed') }}" alt="CCTV Feed" style="width: 100%; height: 100%; object-fit: cover;">
+                    <img id="webcam" src="{{ url_for('video_feed') }}" alt="CCTV Feed" style="width: 100%; height: 100%; object-fit: cover; filter: sepia(20%) contrast(1.2);">
                 </div>
             </div>
 
-            <div class="glass-panel">
-                <h2 style="color: var(--neon-magenta); text-shadow: 0 0 10px var(--neon-magenta);">Live Events</h2>
-                <div class="alert-box" id="alert-log" style="margin-top: 20px;">
-                    <div class="alert-item">System Initialized. Scanning Room CS-102...</div>
+            <div class="glass-panel" style="display: flex; flex-direction: column;">
+                <h2 style="color: var(--cyber-magenta); font-size: 1.2rem; margin-bottom: 15px;">ALERT_LOGS</h2>
+                <div class="alert-box" id="alert-log" style="flex-grow: 1;">
+                    <div class="alert-item">INITIATING_HEURISTIC_ANALYSIS...</div>
+                    <div class="alert-item">SCANNING_ROOM_CS_102...</div>
+                </div>
+                
+                <div style="margin-top: 20px; padding: 15px; background: rgba(0, 243, 255, 0.05); border: 1px solid var(--cyber-blue); font-family: monospace; font-size: 0.7rem; color: var(--cyber-blue);">
+                    <p>> SYSTEM LOAD: 38%</p>
+                    <p>> AI_CONFIDENCE: 97.2%</p>
+                    <p>> UPTIME: 00:45:12</p>
                 </div>
             </div>
         </main>

@@ -1,5 +1,7 @@
 from flask import Flask, render_template, Response, jsonify
 import cv2
+import threading
+import sqlite3
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
@@ -59,10 +61,72 @@ def is_near(bbox1, bbox2, iou_thresh=0.05):
     iou = interArea / unionArea
     return iou >= iou_thresh
 
+class VideoCaptureThread:
+    def __init__(self, src):
+        self.cap = cv2.VideoCapture(src)
+        self.ret = False
+        self.frame = None
+        self.stopped = False
+        self.lock = threading.Lock()
+
+    def start(self):
+        t = threading.Thread(target=self.update, args=())
+        t.daemon = True
+        t.start()
+        return self
+
+    def update(self):
+        while not self.stopped:
+            ret, frame = self.cap.read()
+            with self.lock:
+                self.ret = ret
+                self.frame = frame
+            time.sleep(0.01)  # small sleep to avoid cpu hogging
+
+    def read(self):
+        with self.lock:
+            return self.ret, self.frame
+
+    def stop(self):
+        self.stopped = True
+        if self.cap.isOpened():
+            self.cap.release()
+
 # Global variables to pass data to the frontend
 current_alert = "System Initialized. Monitoring active."
 is_critical = False
 direction_history = []  # list of (timestamp, direction)
+last_log_time = {}      # dict of student_id: last_logged_timestamp
+
+def init_db():
+    conn = sqlite3.connect('cheatcam.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS incidents
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  timestamp TEXT,
+                  location TEXT,
+                  student_id TEXT,
+                  infraction TEXT,
+                  status TEXT)''')
+    conn.commit()
+    conn.close()
+
+def log_incident(student_id, infraction, status):
+    current_time = time.time()
+    # 5-second cooldown per student/infraction to avoid spam
+    key = f"{student_id}_{infraction}"
+    if key in last_log_time and current_time - last_log_time[key] < 5:
+        return
+    
+    last_log_time[key] = current_time
+    
+    conn = sqlite3.connect('cheatcam.db')
+    c = conn.cursor()
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    c.execute("INSERT INTO incidents (timestamp, location, student_id, infraction, status) VALUES (?, ?, ?, ?, ?)",
+              (timestamp, "CS-101", student_id, infraction, status))
+    conn.commit()
+    conn.close()
 
 def detect_head_direction(landmarks, frame_w, frame_h):
     nose = landmarks[1]
@@ -78,148 +142,159 @@ def detect_head_direction(landmarks, frame_w, frame_h):
 
 def generate_frames():
     global current_alert, is_critical
-    cap = cv2.VideoCapture(0)
+    video_url = "http://172.30.233.205:8080/video" 
+    # Use thread to avoid buffering lag with IP Camera
+    cap_thread = VideoCaptureThread(video_url).start()
 
-    while True:
-        ret, frame = cap.read()
-        if not ret: break
+    try:
+        while True:
+            ret, frame = cap_thread.read()
+            if not ret or frame is None:
+                time.sleep(0.01)
+                continue
 
-        frame = cv2.flip(frame, 1)
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
-        results = detector.detect(mp_image)
-        frame_h, frame_w, _ = frame.shape
+            frame = cv2.flip(frame, 1)
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
+            results = detector.detect(mp_image)
+            frame_h, frame_w, _ = frame.shape
 
-        # Reset alert state for the current frame
-        current_alert = "Monitoring..."
-        is_critical = False
+            # Reset alert state for the current frame
+            current_alert = "Monitoring..."
+            is_critical = False
 
-        # YOLOv8 object/mobile detection (cheating device detection)
-        yolo_candidates = []
-        mobile_count = 0
-        if yolo_model is not None:
-            try:
-                yolo_results = yolo_model(rgb_frame, imgsz=640, conf=0.35, device='cpu')
-                if len(yolo_results) > 0:
-                    yolo_res = yolo_results[0]
-                    for box in yolo_res.boxes:
-                        cls_id = int(box.cls.cpu().numpy()[0]) if hasattr(box, 'cls') else int(box.cls)
-                        name = yolo_res.names.get(cls_id, str(cls_id)) if hasattr(yolo_res, 'names') else str(cls_id)
-                        x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy()) if hasattr(box, 'xyxy') else map(int, box.xyxy[0])
-                        conf = float(box.conf.cpu().numpy()[0]) if hasattr(box, 'conf') else float(box.conf)
+            # YOLOv8 object/mobile detection (cheating device detection)
+            yolo_candidates = []
+            mobile_count = 0
+            if yolo_model is not None:
+                try:
+                    yolo_results = yolo_model(rgb_frame, imgsz=640, conf=0.35, device='cpu')
+                    if len(yolo_results) > 0:
+                        yolo_res = yolo_results[0]
+                        for box in yolo_res.boxes:
+                            cls_id = int(box.cls.cpu().numpy()[0]) if hasattr(box, 'cls') else int(box.cls)
+                            name = yolo_res.names.get(cls_id, str(cls_id)) if hasattr(yolo_res, 'names') else str(cls_id)
+                            x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy()) if hasattr(box, 'xyxy') else map(int, box.xyxy[0])
+                            conf = float(box.conf.cpu().numpy()[0]) if hasattr(box, 'conf') else float(box.conf)
 
-                        # draw all detections as reference
-                        cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
-                        cv2.putText(frame, f"{name} {conf:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 0, 0), 2)
+                            # draw all detections as reference
+                            cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
+                            cv2.putText(frame, f"{name} {conf:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 0, 0), 2)
 
-                        # candidate filtering is stricter to avoid bottle and big objects
-                        if name in cheating_objects and conf >= 0.25:
-                            yolo_candidates.append((x1, y1, x2, y2, name, conf))
-                            mobile_count += 1  # Count all cheating devices in frame
-            except Exception as e:
-                print('YOLO detection error:', e)
+                            # candidate filtering is stricter to avoid bottle and big objects
+                            if name in cheating_objects and conf >= 0.25:
+                                yolo_candidates.append((x1, y1, x2, y2, name, conf))
+                                mobile_count += 1  # Count all cheating devices in frame
+                except Exception as e:
+                    print('YOLO detection error:', e)
 
-        if results.face_landmarks:
-            total_faces = len(results.face_landmarks)
-            cv2.putText(frame, f"Students Tracking: {total_faces}", (30, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+            if results.face_landmarks:
+                total_faces = len(results.face_landmarks)
+                cv2.putText(frame, f"Students Tracking: {total_faces}", (30, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
 
-            suspect_count = 0
-            face_boxes = []
+                suspect_count = 0
+                face_boxes = []
 
-            # Loop through EVERY face detected in the classroom
-            for face_id, face_landmarks in enumerate(results.face_landmarks):
-                direction = detect_head_direction(face_landmarks, frame_w, frame_h)
-                direction_history.append((time.time(), direction))
-                
-                # Calculate Bounding Box coordinates
-                x_coords = [int(lm.x * frame_w) for lm in face_landmarks]
-                y_coords = [int(lm.y * frame_h) for lm in face_landmarks]
-                x_min, x_max = min(x_coords), max(x_coords)
-                y_min, y_max = min(y_coords), max(y_coords)
+                # Loop through EVERY face detected in the classroom
+                for face_id, face_landmarks in enumerate(results.face_landmarks):
+                    direction = detect_head_direction(face_landmarks, frame_w, frame_h)
+                    direction_history.append((time.time(), direction))
+                    
+                    # Calculate Bounding Box coordinates
+                    x_coords = [int(lm.x * frame_w) for lm in face_landmarks]
+                    y_coords = [int(lm.y * frame_h) for lm in face_landmarks]
+                    x_min, x_max = min(x_coords), max(x_coords)
+                    y_min, y_max = min(y_coords), max(y_coords)
 
-                # Expand the bounding box slightly around the face
-                x_min, y_min = max(0, x_min - 20), max(0, y_min - 20)
-                x_max, y_max = min(frame_w, x_max + 20), min(frame_h, y_max + 20)
-                face_boxes.append((x_min, y_min, x_max, y_max))
+                    # Expand the bounding box slightly around the face
+                    x_min, y_min = max(0, x_min - 20), max(0, y_min - 20)
+                    x_max, y_max = min(frame_w, x_max + 20), min(frame_h, y_max + 20)
+                    face_boxes.append((x_min, y_min, x_max, y_max))
 
-                # Determine box color based on cheating status
-                box_color = (0, 255, 0) # Green for looking center
-                
-                if direction != "Looking Center":
-                    suspect_count += 1
-                    box_color = (0, 0, 255) # Red for cheating
-                    # Draw a warning directly over the cheating student's head
-                    cv2.putText(frame, f"ID:{face_id} {direction}", (x_min, y_min - 10), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                    # Determine box color based on cheating status
+                    box_color = (0, 255, 0) # Green for looking center
+                    
+                    if direction != "Looking Center":
+                        suspect_count += 1
+                        box_color = (0, 0, 255) # Red for cheating
+                        # Log to database
+                        log_incident(f"ID:{face_id}", direction, "Flagged")
+                        # Draw a warning directly over the cheating student's head
+                        cv2.putText(frame, f"ID:{face_id} {direction}", (x_min, y_min - 10), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                    else:
+                        # Draw safe status
+                        cv2.putText(frame, f"ID:{face_id} Clear", (x_min, y_min - 10), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+
+                    # Draw the Bounding Box
+                    cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), box_color, 2)
+
+                    # Draw tracking dots (Nose, Left Eye, Right Eye)
+                    for lm_index in [1, 33, 263]:
+                        lm = face_landmarks[lm_index]
+                        cv2.circle(frame, (int(lm.x * frame_w), int(lm.y * frame_h)), 3, box_color, -1)
+
+                # Process direction history for looking around detection
+                current_time = time.time()
+                # Keep only last 30 seconds
+                direction_history[:] = [h for h in direction_history if current_time - h[0] <= 30]
+                # Sort by time
+                direction_history.sort(key=lambda x: x[0])
+                # Count direction changes
+                change_count = 0
+                prev_dir = None
+                for _, dir in direction_history:
+                    if prev_dir is not None and dir != prev_dir:
+                        change_count += 1
+                    prev_dir = dir
+                looking_around = change_count >= 5  # threshold: 5 changes in 30 seconds
+
+                # Count cheating device candidates that are near detected faces
+                for x1, y1, x2, y2, name, conf in yolo_candidates:
+                    for face_box in face_boxes:
+                        if is_near(face_box, (x1, y1, x2, y2), iou_thresh=0.05):
+                            mobile_count += 1
+                            log_incident(f"Unknown", f"{name} detected near student", "Critical")
+                            cv2.putText(frame, f"{name} detected near face", (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 255), 2)
+                            break
+
+                # Update the web dashboard alerts based on the whole room and object detection
+                if suspect_count > 0 and mobile_count > 0:
+                    current_alert = f"CRITICAL: {suspect_count} suspicious student(s) and {mobile_count} potential cheating device(s) detected!"
+                    is_critical = True
+                elif suspect_count > 0:
+                    current_alert = f"WARNING: {suspect_count} student(s) showing suspicious behavior!"
+                    is_critical = True
+                elif mobile_count > 0:
+                    current_alert = f"WARNING: {mobile_count} potential cheating device(s) detected!"
+                    is_critical = True
+                elif looking_around:
+                    current_alert = "WARNING: Frequent head movement detected - possible looking around."
+                    is_critical = True
+                    log_incident("Room", "Frequent head movement", "Flagged")
                 else:
-                    # Draw safe status
-                    cv2.putText(frame, f"ID:{face_id} Clear", (x_min, y_min - 10), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                    if not is_critical:
+                        current_alert = "Room clear. All students focused."
+                        is_critical = False
 
-                # Draw the Bounding Box
-                cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), box_color, 2)
-
-                # Draw tracking dots (Nose, Left Eye, Right Eye)
-                for lm_index in [1, 33, 263]:
-                    lm = face_landmarks[lm_index]
-                    cv2.circle(frame, (int(lm.x * frame_w), int(lm.y * frame_h)), 3, box_color, -1)
-
-            # Process direction history for looking around detection
-            current_time = time.time()
-            # Keep only last 30 seconds
-            direction_history[:] = [h for h in direction_history if current_time - h[0] <= 30]
-            # Sort by time
-            direction_history.sort(key=lambda x: x[0])
-            # Count direction changes
-            change_count = 0
-            prev_dir = None
-            for _, dir in direction_history:
-                if prev_dir is not None and dir != prev_dir:
-                    change_count += 1
-                prev_dir = dir
-            looking_around = change_count >= 5  # threshold: 5 changes in 30 seconds
-
-            # Count cheating device candidates that are near detected faces
-            for x1, y1, x2, y2, name, conf in yolo_candidates:
-                for face_box in face_boxes:
-                    if is_near(face_box, (x1, y1, x2, y2), iou_thresh=0.05):
-                        mobile_count += 1
-                        cv2.putText(frame, f"{name} detected near face", (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 255), 2)
-                        break
-
-            # Update the web dashboard alerts based on the whole room and object detection
-            if suspect_count > 0 and mobile_count > 0:
-                current_alert = f"CRITICAL: {suspect_count} suspicious student(s) and {mobile_count} potential cheating device(s) detected!"
-                is_critical = True
-            elif suspect_count > 0:
-                current_alert = f"WARNING: {suspect_count} student(s) showing suspicious behavior!"
-                is_critical = True
-            elif mobile_count > 0:
-                current_alert = f"WARNING: {mobile_count} potential cheating device(s) detected!"
-                is_critical = True
-            elif looking_around:
-                current_alert = "WARNING: Frequent head movement detected - possible looking around."
-                is_critical = True
             else:
-                if not is_critical:
-                    current_alert = "Room clear. All students focused."
+                # If no faces are found at all
+                if mobile_count > 0:
+                    current_alert = f"WARNING: {mobile_count} potential cheating device(s) detected!"
+                    is_critical = True
+                else:
+                    current_alert = "No students detected in frame."
                     is_critical = False
+                cv2.putText(frame, "No Face Detected!", (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
 
-        else:
-            # If no faces are found at all
-            if mobile_count > 0:
-                current_alert = f"WARNING: {mobile_count} potential cheating device(s) detected!"
-                is_critical = True
-            else:
-                current_alert = "No students detected in frame."
-                is_critical = False
-            cv2.putText(frame, "No Face Detected!", (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
-
-        # Encode frame for web streaming
-        ret, buffer = cv2.imencode('.jpg', frame)
-        frame_bytes = buffer.tobytes()
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+            # Encode frame for web streaming
+            ret, buffer = cv2.imencode('.jpg', frame)
+            frame_bytes = buffer.tobytes()
+            yield (b'--frame\r\n'
+                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+    finally:
+        cap_thread.stop()
 
 # --- Web Routes ---
 @app.route('/')
@@ -238,8 +313,12 @@ def classroom():
 
 @app.route('/database')
 def database():
-    # Links to "Alert Database"
-    return render_template('Database.html')
+    conn = sqlite3.connect('cheatcam.db')
+    c = conn.cursor()
+    c.execute("SELECT timestamp, location, student_id, infraction, status FROM incidents ORDER BY id DESC")
+    incidents = c.fetchall()
+    conn.close()
+    return render_template('Database.html', incidents=incidents)
 
 @app.route('/video_feed')
 def video_feed():
@@ -250,6 +329,7 @@ def get_alert():
     return jsonify({'alert': current_alert, 'critical': is_critical})
 
 if __name__ == '__main__':
+    init_db()
     app.run(debug=True, port=5000)
 
     
