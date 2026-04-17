@@ -12,6 +12,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from datetime import datetime
 from ultralytics import YOLO
+from chit_classifier import ChitClassifier
 
 app = Flask(__name__)
 
@@ -21,6 +22,12 @@ if not os.path.exists(model_path):
     print("Downloading face_landmarker.task model...")
     url = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task"
     urllib.request.urlretrieve(url, model_path)
+
+hand_model_path = 'hand_landmarker.task'
+if not os.path.exists(hand_model_path):
+    print("Downloading hand_landmarker.task model...")
+    hand_url = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
+    urllib.request.urlretrieve(hand_url, hand_model_path)
 
 # --- 2. Initialize MediaPipe ---
 base_options = python.BaseOptions(model_asset_path=model_path)
@@ -32,16 +39,27 @@ options = vision.FaceLandmarkerOptions(
 )
 detector = vision.FaceLandmarker.create_from_options(options)
 
+# --- MediaPipe Hands Initialization (Modern Tasks API) ---
+base_options_hands = python.BaseOptions(model_asset_path=hand_model_path)
+options_hands = vision.HandLandmarkerOptions(
+    base_options=base_options_hands,
+    num_hands=15
+)
+hands_detector_mp = vision.HandLandmarker.create_from_options(options_hands)
+
 # --- 2.5 Initialize YOLOv8 for object/mobile detection ---
 try:
-    yolo_model = YOLO('yolov8n.pt')
-    print('YOLOv8n model loaded successfully.')
+    yolo_model = YOLO('yolov8s.pt')
+    print('YOLOv8s model loaded successfully.')
 except Exception as e:
-    print('Failed to load YOLOv8n model:', e)
+    print('Failed to load YOLOv8s model:', e)
     yolo_model = None
 
 # stricter device list, avoids bottle/furniture false positive as phone
 cheating_objects = {'cell phone', 'laptop', 'keyboard', 'mouse', 'remote', 'mobile phone'}
+
+# Initialize Chit Classifier for small foreign paper detection
+chit_detector = ChitClassifier(min_area=300, max_area=4000)
 
 # helper for proximity check
 
@@ -142,7 +160,7 @@ def detect_head_direction(landmarks, frame_w, frame_h):
 
 def generate_frames():
     global current_alert, is_critical
-    video_url = "http://172.30.233.205:8080/video" 
+    video_url = "http://192.168.1.36:8080/video" 
     # Use thread to avoid buffering lag with IP Camera
     cap_thread = VideoCaptureThread(video_url).start()
 
@@ -187,6 +205,45 @@ def generate_frames():
                                 mobile_count += 1  # Count all cheating devices in frame
                 except Exception as e:
                     print('YOLO detection error:', e)
+
+            # --- Hand Detection (for Proximity Verification) ---
+            hands_results = hands_detector_mp.detect(mp_image)
+            hand_boxes = []
+            if hands_results.hand_landmarks:
+                for hand_landmarks in hands_results.hand_landmarks:
+                    x_coords = [int(lm.x * frame_w) for lm in hand_landmarks]
+                    y_coords = [int(lm.y * frame_h) for lm in hand_landmarks]
+                    
+                    # Create a generous pad around the hand to catch papers held or nearby
+                    hx_min, hx_max = max(0, min(x_coords) - 60), min(frame_w, max(x_coords) + 60)
+                    hy_min, hy_max = max(0, min(y_coords) - 60), min(frame_h, max(y_coords) + 60)
+                    hand_boxes.append((hx_min, hy_min, hx_max, hy_max))
+                    
+                    # Draw a magenta boundary box around detected hands for visual clarity
+                    cv2.rectangle(frame, (hx_min, hy_min), (hx_max, hy_max), (255, 0, 255), 1)
+
+            # --- Chit Detection Integration ---
+            raw_chits = chit_detector.detect(frame)
+            chit_candidates = []
+            
+            # PROXIMITY CHECK: Only accept chits if their bounding box overlaps with a Hand Zone
+            for cx1, cy1, cx2, cy2, cname, cconf in raw_chits:
+                near_hand = False
+                for (hx1, hy1, hx2, hy2) in hand_boxes:
+                    # Check for boundary intersection instead of strict IOU
+                    interW = max(0, min(cx2, hx2) - max(cx1, hx1))
+                    interH = max(0, min(cy2, hy2) - max(cy1, hy1))
+                    if interW > 0 and interH > 0:
+                        near_hand = True
+                        break
+                        
+                if near_hand:
+                    chit_candidates.append((cx1, cy1, cx2, cy2, cname, cconf))
+
+            chit_count = len(chit_candidates)
+            for cx1, cy1, cx2, cy2, cname, cconf in chit_candidates:
+                cv2.rectangle(frame, (cx1, cy1), (cx2, cy2), (0, 165, 255), 2) # Orange bounding box for chit
+                cv2.putText(frame, f"{cname}", (cx1, cy1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 165, 255), 2)
 
             if results.face_landmarks:
                 total_faces = len(results.face_landmarks)
@@ -259,15 +316,25 @@ def generate_frames():
                             cv2.putText(frame, f"{name} detected near face", (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 255), 2)
                             break
 
+                # Count paper chits that are near detected faces
+                for cx1, cy1, cx2, cy2, cname, cconf in chit_candidates:
+                    for face_box in face_boxes:
+                        if is_near(face_box, (cx1, cy1, cx2, cy2), iou_thresh=0.05):
+                            chit_count += 1
+                            log_incident(f"Unknown", f"{cname} detected near student", "Critical")
+                            cv2.putText(frame, f"{cname} near face", (cx1, cy2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 255), 2)
+                            break
+
                 # Update the web dashboard alerts based on the whole room and object detection
-                if suspect_count > 0 and mobile_count > 0:
-                    current_alert = f"CRITICAL: {suspect_count} suspicious student(s) and {mobile_count} potential cheating device(s) detected!"
+                total_devices = mobile_count + chit_count
+                if suspect_count > 0 and total_devices > 0:
+                    current_alert = f"CRITICAL: {suspect_count} suspicious student(s) and {total_devices} potential cheating material/device(s) detected!"
                     is_critical = True
                 elif suspect_count > 0:
                     current_alert = f"WARNING: {suspect_count} student(s) showing suspicious behavior!"
                     is_critical = True
-                elif mobile_count > 0:
-                    current_alert = f"WARNING: {mobile_count} potential cheating device(s) detected!"
+                elif total_devices > 0:
+                    current_alert = f"WARNING: {total_devices} potential cheating material/device(s) detected!"
                     is_critical = True
                 elif looking_around:
                     current_alert = "WARNING: Frequent head movement detected - possible looking around."
@@ -280,8 +347,9 @@ def generate_frames():
 
             else:
                 # If no faces are found at all
-                if mobile_count > 0:
-                    current_alert = f"WARNING: {mobile_count} potential cheating device(s) detected!"
+                total_devices = mobile_count + chit_count
+                if total_devices > 0:
+                    current_alert = f"WARNING: {total_devices} potential cheating material/device(s) detected!"
                     is_critical = True
                 else:
                     current_alert = "No students detected in frame."
