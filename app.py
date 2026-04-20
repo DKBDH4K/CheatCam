@@ -35,7 +35,10 @@ options = vision.FaceLandmarkerOptions(
     base_options=base_options,
     num_faces=15, # Track up to 15 students at once
     output_face_blendshapes=False,
-    output_facial_transformation_matrixes=False
+    output_facial_transformation_matrixes=False,
+    min_face_detection_confidence=0.1,
+    min_face_presence_confidence=0.1,
+    min_tracking_confidence=0.1
 )
 detector = vision.FaceLandmarker.create_from_options(options)
 
@@ -110,6 +113,11 @@ class VideoCaptureThread:
         if self.cap.isOpened():
             self.cap.release()
 
+class MockLandmark:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
 # Global variables to pass data to the frontend
 current_alert = "System Initialized. Monitoring active."
 is_critical = False
@@ -152,7 +160,7 @@ def detect_head_direction(landmarks, frame_w, frame_h):
     right_eye = landmarks[263]
     nose_x, left_eye_x, right_eye_x = int(nose.x * frame_w), int(left_eye.x * frame_w), int(right_eye.x * frame_w)
     eye_center = (left_eye_x + right_eye_x) / 2
-    threshold = abs(right_eye_x - left_eye_x) * 0.25 
+    threshold = abs(right_eye_x - left_eye_x) * 0.15 
 
     if nose_x < eye_center - threshold: return "Looking Left"
     elif nose_x > eye_center + threshold: return "Looking Right"
@@ -160,7 +168,7 @@ def detect_head_direction(landmarks, frame_w, frame_h):
 
 def generate_frames():
     global current_alert, is_critical
-    video_url = "http://192.168.1.36:8080/video" 
+    video_url = "http://172.30.233.205:8080/video" 
     # Use thread to avoid buffering lag with IP Camera
     cap_thread = VideoCaptureThread(video_url).start()
 
@@ -183,6 +191,7 @@ def generate_frames():
 
             # YOLOv8 object/mobile detection (cheating device detection)
             yolo_candidates = []
+            person_boxes = []
             mobile_count = 0
             if yolo_model is not None:
                 try:
@@ -195,12 +204,13 @@ def generate_frames():
                             x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy()) if hasattr(box, 'xyxy') else map(int, box.xyxy[0])
                             conf = float(box.conf.cpu().numpy()[0]) if hasattr(box, 'conf') else float(box.conf)
 
-                            # draw all detections as reference
-                            cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
-                            cv2.putText(frame, f"{name} {conf:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 0, 0), 2)
-
-                            # candidate filtering is stricter to avoid bottle and big objects
-                            if name in cheating_objects and conf >= 0.25:
+                            if name == 'person':
+                                person_boxes.append((x1, y1, x2, y2))
+                                cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
+                                cv2.putText(frame, f"{name} {conf:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 0, 0), 2)
+                            elif name in cheating_objects and conf >= 0.25:
+                                cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
+                                cv2.putText(frame, f"{name} {conf:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 0, 0), 2)
                                 yolo_candidates.append((x1, y1, x2, y2, name, conf))
                                 mobile_count += 1  # Count all cheating devices in frame
                 except Exception as e:
@@ -245,15 +255,51 @@ def generate_frames():
                 cv2.rectangle(frame, (cx1, cy1), (cx2, cy2), (0, 165, 255), 2) # Orange bounding box for chit
                 cv2.putText(frame, f"{cname}", (cx1, cy1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 165, 255), 2)
 
-            if results.face_landmarks:
-                total_faces = len(results.face_landmarks)
+            # --- Combine Full Frame and Cropped Faces ---
+            all_face_landmarks = list(results.face_landmarks) if results.face_landmarks else []
+            
+            for px1, py1, px2, py2 in person_boxes:
+                # Capture the full person box with generous margins
+                cx1, cy1 = max(0, px1 - 50), max(0, py1 - 50)
+                cx2, cy2 = min(frame_w, px2 + 50), min(frame_h, py2 + 50)
+                crop_w = cx2 - cx1
+                crop_h = cy2 - cy1
+                
+                if crop_w > 20 and crop_h > 20:
+                    crop_rgb = rgb_frame[cy1:cy2, cx1:cx2].copy()
+                    mp_crop = mp.Image(image_format=mp.ImageFormat.SRGB, data=crop_rgb)
+                    crop_results = detector.detect(mp_crop)
+                    
+                    if crop_results.face_landmarks:
+                        for crop_face in crop_results.face_landmarks:
+                            global_face = []
+                            for lm in crop_face:
+                                global_x = (lm.x * crop_w + cx1) / frame_w
+                                global_y = (lm.y * crop_h + cy1) / frame_h
+                                global_face.append(MockLandmark(global_x, global_y))
+                            
+                            # Check for duplicates using Nose position (index 1)
+                            is_duplicate = False
+                            new_nose = global_face[1]
+                            for existing_face in all_face_landmarks:
+                                ex_nose = existing_face[1]
+                                dist = ((new_nose.x - ex_nose.x) * frame_w)**2 + ((new_nose.y - ex_nose.y) * frame_h)**2
+                                if dist < 2500: # 50 pixels distance threshold for same face
+                                    is_duplicate = True
+                                    break
+                            
+                            if not is_duplicate:
+                                all_face_landmarks.append(global_face)
+
+            if all_face_landmarks:
+                total_faces = len(all_face_landmarks)
                 cv2.putText(frame, f"Students Tracking: {total_faces}", (30, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
 
                 suspect_count = 0
                 face_boxes = []
 
                 # Loop through EVERY face detected in the classroom
-                for face_id, face_landmarks in enumerate(results.face_landmarks):
+                for face_id, face_landmarks in enumerate(all_face_landmarks):
                     direction = detect_head_direction(face_landmarks, frame_w, frame_h)
                     direction_history.append((time.time(), direction))
                     
