@@ -26,9 +26,13 @@ By combining object detection with facial landmarking through a custom two-stage
 
 ```text
 CheatCam/
-├── app.py                 # Core Flask application and CV pipeline
+├── app.py                 # Core Flask application and CV pipeline (Standard)
+├── app_nvidia_cuda.py     # NVIDIA/CUDA Optimized version (Fastest for RTX 3060)
+├── app_auto_hw.py         # Hardware Auto-Detection version
 ├── chit_classifier.py     # Custom OpenCV module to detect small white paper chits
-├── requirements.txt       # Python dependency list
+├── requirements.txt       # Standard Python dependency list
+├── requirements_gpu.txt   # Dependencies for GPU/Hardware acceleration
+├── gpu_setup_guide.md     # Detailed guide for setting up NVIDIA/CUDA
 ├── cheatcam.db            # SQLite database for storing incident logs
 ├── yolov8s.pt             # YOLOv8 Small model weights
 ├── face_landmarker.task   # MediaPipe Face weights (Auto-downloaded if missing)
@@ -45,25 +49,45 @@ CheatCam/
 
 1.  **Clone the Repository** and navigate to the project root.
 2.  **Install Dependencies:**
-    Make sure you have Python installed, then run:
-    ```bash
-    pip install -r requirements.txt
-    ```
-    *Required packages generally include: `flask`, `opencv-python`, `mediapipe`, `ultralytics`, `numpy`, and `firebase-admin` (if using cloud integration).*
+    *   **Standard (CPU):**
+        ```bash
+        pip install -r requirements.txt
+        ```
+    *   **Hardware Accelerated (GPU):**
+        Refer to [gpu_setup_guide.md](gpu_setup_guide.md) for detailed installation of CUDA-enabled Torch and run:
+        ```bash
+        pip install -r requirements_gpu.txt
+        ```
 3.  **Model Downloads:** 
     The YOLOv8 model (`yolov8s.pt`) and MediaPipe tasks are required. `app.py` is configured to auto-download the MediaPipe `.task` files on the first run if they are missing.
 
+## ⚡ Hardware Acceleration (RTX 3060 / NVIDIA)
+
+CheatCam now supports native hardware acceleration for smoother frame rates and lower CPU usage:
+
+*   **`app_nvidia_cuda.py`**: Specifically tuned for NVIDIA RTX GPUs. It forces YOLOv8 to CUDA and uses the MediaPipe GPU Delegate. Recommended for your RTX 3060.
+*   **`app_auto_hw.py`**: Automatically detects the best available backend (CUDA/CPU).
+
 ## ▶️ Running the Application
 
-1.  Start the Flask backend:
-    ```bash
-    python app.py
-    ```
+1.  Start the Flask backend of your choice:
+    *   **NVIDIA GPU version (Recommended):**
+        ```bash
+        python app_nvidia_cuda.py
+        ```
+    *   **Auto Hardware version:**
+        ```bash
+        python app_auto_hw.py
+        ```
+    *   **Standard version:**
+        ```bash
+        python app.py
+        ```
 2.  Open your web browser and navigate to:
     ```
-    http://localhost:5000/
+    http://localhost:5000/  # (or 5001 for app_auto_hw)
     ```
-3.  *Note on Camera Source:* By default, `app.py` is configured to hook into an IP camera url (`http://172.30.233.205:8080/video`). To use a standard local webcam, you can edit line 166 in `app.py` to `video_url = 0`.
+3.  *Note on Camera Source:* The scripts are configured to use an IP camera or webcam. Check the `video_url` variable in each script to toggle between `0` (webcam) and your IP camera URL.
 
 ## 🧠 How it Works
 
