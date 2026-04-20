@@ -1,4 +1,4 @@
-# CheatCam
+# AI CheatCam - AI Based Cheating Detection System
 
 CheatCam is an advanced, AI-powered multi-modal classroom monitoring system designed to detect anomalous behavior and potential academic cheating in real-time. Built using Flask, OpenCV, MediaPipe, and YOLOv8, CheatCam processes live video feeds to track student head movements, identify prohibited objects, and detect hidden cheat sheets (chits). 
 
