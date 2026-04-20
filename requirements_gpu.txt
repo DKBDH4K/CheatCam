@@ -1,0 +1,8 @@
+flask
+opencv-python
+numpy
+mediapipe
+firebase-admin
+ultralytics
+# Install CUDA-enabled Torch separately for best results:
+# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
